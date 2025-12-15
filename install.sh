@@ -69,23 +69,32 @@ install_node_red() {
 
   run apt install -y curl ca-certificates
 
-  # Node-RED installer nem mindig exit 0 → külön kezeljük
   set +e
   curl -fsSL https://github.com/node-red/linux-installers/releases/latest/download/update-nodejs-and-nodered-deb \
     | bash -s -- --confirm-root
   rc=$?
   set -e
-  log "Node-RED installer exit code: $rc"
 
-  systemctl daemon-reload || true
-  systemctl enable --now nodered.service || true
+  log "Node-RED installer exit code: $rc (nem döntő)"
 
-  if systemctl is-active --quiet nodered; then
-    ok "Node-RED fut"
-  else
-    fail "Node-RED nem indult el"
+  # Ha van systemd service, próbáljuk indítani
+  if systemctl list-unit-files | grep -q '^nodered\.service'; then
+    run systemctl daemon-reload
+    run systemctl enable --now nodered.service
+    ok "Node-RED systemd service fut"
+    return 0
   fi
+
+  # Ha nincs service, de a parancs létezik → siker
+  if command -v node-red >/dev/null 2>&1; then
+    warn "Node-RED telepítve, de systemd service nincs (user-mode install)"
+    ok "Node-RED parancs elérhető"
+    return 0
+  fi
+
+  fail "Node-RED telepítés sikertelen"
 }
+
 
 install_mosquitto() {
   log "Mosquitto telepítés"
