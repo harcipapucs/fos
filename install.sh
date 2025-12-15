@@ -1,4 +1,5 @@
 #!/bin/bash
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 set -e
 
 ### ====== KONFIG ======
@@ -79,10 +80,15 @@ install_ssh() {
 install_node_red() {
     log "curl telepítés"
     apt install curl
+    install_node_red() {
     log "Node-RED telepítés"
-    bash <(curl -sL https://github.com/node-red/linux-installers/releases/latest/download/update-nodejs-and-nodered-deb)
+
+    export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    run bash -c "curl -fsSL https://raw.githubusercontent.com/node-red/linux-installers/master/deb/update-nodejs-and-nodered | bash"
+
     run systemctl enable --now nodered.service
     ok "Node-RED telepítve"
+}
 }
 
 install_mosquitto() {
