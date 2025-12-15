@@ -65,34 +65,32 @@ install_ssh() {
 }
 
 install_node_red() {
-  log "Node-RED telepítés"
-
-  run apt install -y curl ca-certificates
-
+  # Node-RED installer néha nem exit 0-val tér vissza -> nem az exit code a döntő.
+  apt_install curl ca-certificates || return 1
+ 
+  log "Node-RED telepítés (non-interactive --confirm-root)"
   set +e
   curl -fsSL https://github.com/node-red/linux-installers/releases/latest/download/update-nodejs-and-nodered-deb \
     | bash -s -- --confirm-root
-  rc=$?
+  local rc=$?
   set -e
-
-  log "Node-RED installer exit code: $rc (nem döntő)"
-
-  # Ha van systemd service, próbáljuk indítani
+  log "Node-RED installer exit code: $rc"
+ 
+  # próbáljuk indítani, ha létrejött
+  run systemctl daemon-reload || true
   if systemctl list-unit-files | grep -q '^nodered\.service'; then
-    run systemctl daemon-reload
-    run systemctl enable --now nodered.service
-    ok "Node-RED systemd service fut"
+    run systemctl enable --now nodered.service || true
+  fi
+ 
+  # tényleges sikerfeltétel: fut a service (vagy legalább települt a parancs)
+  if systemctl is-active --quiet nodered 2>/dev/null; then
     return 0
   fi
-
-  # Ha nincs service, de a parancs létezik → siker
   if command -v node-red >/dev/null 2>&1; then
-    warn "Node-RED telepítve, de systemd service nincs (user-mode install)"
-    ok "Node-RED parancs elérhető"
-    return 0
+    # Települt, de service nem fut -> ezt hibának vesszük
+    return 1
   fi
-
-  fail "Node-RED telepítés sikertelen"
+  return 1
 }
 
 
