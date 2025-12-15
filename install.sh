@@ -78,14 +78,63 @@ install_ssh() {
 }
 
 install_node_red() {
-    log "curl telepítés"
-    apt install curl
-    install_node_red() {
-    log "Node-RED telepítés"
-    run bash -c "curl -fsSL https://raw.githubusercontent.com/node-red/linux-installers/master/deb/update-nodejs-and-nodered | bash"
-    run systemctl enable --now nodered.service
-    ok "Node-RED telepítve"
+    # Node-RED installer néha nem exit 0-val tér vissza -> nem az exit code a döntő.
+  apt_install curl ca-certificates || return 1
+ 
+  log "Node-RED telepítés (non-interactive --confirm-root)"
+  set +e
+  curl -fsSL https://github.com/node-red/linux-installers/releases/latest/download/update-nodejs-and-nodered-deb \
+    | bash -s -- --confirm-root
+  local rc=$?
+  set -e
+  log "Node-RED installer exit code: $rc"
+ 
+  # próbáljuk indítani, ha létrejött
+  run systemctl daemon-reload || true
+  if systemctl list-unit-files | grep -q '^nodered\.service'; then
+    run systemctl enable --now nodered.service || true
+  fi
+ 
+  # tényleges sikerfeltétel: fut a service (vagy legalább települt a parancs)
+  if systemctl is-active --quiet nodered 2>/dev/null; then
+    return 0
+  fi
+  if command -v node-red >/dev/null 2>&1; then
+    # Települt, de service nem fut -> ezt hibának vesszük
+    return 1
+  fi
+  return 1
 }
+ 
+############################################
+# FUTTATÁS
+############################################
+# apt update mindig menjen (különben minden más bukhat)
+if apt_update; then
+  ok "APT update kész"
+else
+  fail "APT update sikertelen (internet/DNS/repo gond)."
+  # Itt még megpróbálhatjuk folytatni, de valószínűleg minden telepítés bukni fog.
+fi
+ 
+# Lépések (config szerint)
+run_install() {
+  local var="$1"
+  local label="$2"
+  local func="$3"
+ 
+  echo -e "${BLUE}==> ${label}${NC}"
+  if [[ "${!var:-false}" == "true" ]]; then
+    if safe_step "$label" "$func"; then
+      ok "$label OK"
+    else
+      fail "$label HIBA"
+    fi
+  else
+    warn "$label kihagyva (config: $var=false)"
+    set_result "$label" "KIHAGYVA"
+  fi
+  echo
 }
 
 install_mosquitto() {
@@ -147,7 +196,7 @@ for s in "${SERVICES[@]}"; do
     fi
 done
 
-### ====== HEALTH CHECK ======
+### ====== HEALTH CHECK + PORT CHECK ======
 echo
 log "Szolgáltatások állapota"
 for svc in apache2 ssh mosquitto mariadb nodered; do
@@ -155,6 +204,13 @@ for svc in apache2 ssh mosquitto mariadb nodered; do
         && ok "$svc RUNNING" \
         || warn "$svc NEM FUT"
 done
+
+log "PORT CHECK (80,1880,1883)"
+if command -v ss >/dev/null 2>&1; then
+  ss -tulpn | grep -E '(:80|:1880|:1883)\b' && ok "Portok rendben" || warn "Nem látok hallgatózó portot (lehet szolgáltatás nem fut)."
+else
+  warn "ss parancs nem elérhető"
+fi
 
 ### ====== SUMMARY ======
 echo -e "${GREEN}
