@@ -100,67 +100,60 @@ run_cmd "apt update -y"
 [[ "$INSTALL_MARIADB" == "true" ]] && install_pkg "MariaDB Server" "apt install -y mariadb-server"
 
 # --- Node-RED ---
-# --- Node-RED ---
 if [[ "$INSTALL_NODE_RED" == "true" ]]; then
     echo -e "${BLUE}▶ Node.js ${NODE_VERSION} + Node-RED telepítése${RESET}"
 
+    # Node.js telepítés
     run_cmd "curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -"
     run_cmd "apt install -y nodejs"
+    
+    # Node-RED telepítés globálisan
     run_cmd "npm install -g --unsafe-perm node-red"
 
+    # Felhasználó létrehozása
     echo -e "${BLUE}▶ Node-RED felhasználó létrehozása${RESET}"
-
     if id "$NODE_RED_USER" &>/dev/null; then
         echo -e "${YELLOW}ℹ Felhasználó már létezik: $NODE_RED_USER${RESET}"
     else
         run_cmd "useradd --system --home $NODE_RED_HOME --shell /usr/sbin/nologin $NODE_RED_USER"
-        run_cmd "mkdir -p $NODE_RED_HOME"
-        run_cmd "chown -R $NODE_RED_USER:$NODE_RED_USER $NODE_RED_HOME"
+        run_cmd "mkdir -p $NODE_RED_HOME && chown -R $NODE_RED_USER:$NODE_RED_USER $NODE_RED_HOME"
     fi
 
+    # Systemd service létrehozása
     echo -e "${BLUE}▶ Node-RED systemd service létrehozása${RESET}"
-
     if [[ "$DRY_RUN" == "false" ]]; then
-        cat <<EOF > /etc/systemd/system/node-red.service
-    [Unit]
-    Description=Node-RED
-    After=network.target
+cat <<EOF > /etc/systemd/system/node-red.service
+[Unit]
+Description=Node-RED
+After=network.target
 
-    [Service]
-    Type=simple
-    User=${NODE_RED_USER}
-    Group=${NODE_RED_USER}
-    WorkingDirectory=${NODE_RED_HOME}
-    ExecStart=/usr/bin/env node-red
-    Restart=always
-    Environment=PATH=/usr/bin:/usr/local/bin
-    Environment=NODE_RED_HOME=${NODE_RED_HOME}
+[Service]
+Type=simple
+User=${NODE_RED_USER}
+Group=${NODE_RED_USER}
+WorkingDirectory=${NODE_RED_HOME}
+ExecStart=/usr/bin/env node-red
+Restart=always
+Environment=PATH=/usr/bin:/usr/local/bin
+Environment=NODE_RED_HOME=${NODE_RED_HOME}
 
-    [Install]
-    WantedBy=multi-user.target
-    EOF
-        else
-            echo -e "${YELLOW}[DRY-RUN] Node-RED service fájl létrehozása kihagyva${RESET}"
-        fi
-    
-        run_cmd "systemctl daemon-reexec"
-        run_cmd "systemctl daemon-reload"
-        run_cmd "systemctl enable node-red"
-        run_cmd "systemctl start node-red"
-    
-        echo -e "${GREEN}✔ Node-RED telepítve és nem rootként fut${RESET}\n"
+[Install]
+WantedBy=multi-user.target
+EOF
+    else
+        echo -e "${YELLOW}[DRY-RUN] Node-RED service fájl létrehozása kihagyva${RESET}"
+    fi
+
+    # Service reload és indítás
+    run_cmd "systemctl daemon-reexec"
+    run_cmd "systemctl daemon-reload"
+    run_cmd "systemctl enable node-red"
+    run_cmd "systemctl start node-red"
+
+    echo -e "${GREEN}✔ Node-RED telepítve és nem rootként fut${RESET}\n"
+
 fi
 
-# --- Apache HTTPS (SSL) ---
-if [[ "$INSTALL_APACHE" == "true" && "$ENABLE_APACHE_SSL" == "true" ]]; then
-    echo -e "${BLUE}▶ Apache HTTPS (SSL) engedélyezése${RESET}"
-
-    run_cmd "a2enmod ssl"
-    run_cmd "a2ensite default-ssl"
-    run_cmd "systemctl reload apache2"
-
-    echo -e "${GREEN}✔ Apache HTTPS engedélyezve${RESET}\n"
-fi
 
 # --- UFW ---
 if [[ "$INSTALL_UFW" == "true" ]]; then
