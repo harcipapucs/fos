@@ -158,8 +158,8 @@ fi
 if [[ "$INSTALL_APACHE" == "true" && "$ENABLE_APACHE_SSL" == "true" ]]; then
     echo -e "${BLUE}▶ Apache HTTPS (SSL) engedélyezése${RESET}"
 
-    run_cmd "a2enmod ssl"
-    run_cmd "a2ensite default-ssl"
+    run_cmd "/sbin/a2enmod ssl"
+    run_cmd "/sbin/a2ensite default-ssl"
     run_cmd "systemctl reload apache2"
 
     echo -e "${GREEN}✔ Apache HTTPS engedélyezve${RESET}\n"
