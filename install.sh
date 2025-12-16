@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================
-#  Debian Server Installer
+#  Debian Server Installer Wizard
 # ==============================
 
 CONFIG_FILE="./config.conf"
@@ -11,15 +11,17 @@ RED="\e[31m"
 GREEN="\e[32m"
 YELLOW="\e[33m"
 BLUE="\e[34m"
+MAGENTA="\e[35m"
 CYAN="\e[36m"
+PINK="\e[95m"
 RESET="\e[0m"
+BOLD="\e[1m"
 
 # --- Betöltés ---
 if [[ ! -f "$CONFIG_FILE" ]]; then
     echo -e "${RED}[ERROR] Hiányzik a konfigurációs fájl!${RESET}"
     exit 1
 fi
-
 source "$CONFIG_FILE"
 
 # --- Logolás ---
@@ -34,54 +36,49 @@ fi
 
 # --- Segédfüggvény ---
 run_cmd() {
+    local DESC="$1"
+    local CMD="$2"
+    echo -ne "${PINK}▶ ${DESC} ... ${RESET}"
     if [[ "$DRY_RUN" == "true" ]]; then
-        echo -e "${YELLOW}[DRY-RUN] $*${RESET}"
+        echo -e "${YELLOW}[DRY-RUN]${RESET}"
     else
-        echo -e "${CYAN}[RUN] $*${RESET}"
-        eval "$@"
+        eval "$CMD" &>/dev/null
+        if [[ $? -eq 0 ]]; then
+            echo -e "${GREEN}kész${RESET}"
+        else
+            echo -e "${RED}hiba!${RESET}"
+        fi
     fi
 }
 
 check_port_nc() {
     local PORT="$1"
     local NAME="$2"
-
-    if nc -z localhost "$PORT" 2>/dev/null; then
-        echo -e "${GREEN}✔ $NAME ($PORT) TCP OK${RESET}"
+    nc -z localhost "$PORT" &>/dev/null
+    if [[ $? -eq 0 ]]; then
+        echo -e "${GREEN}✔ $NAME ($PORT) elérhető${RESET}"
     else
-        echo -e "${RED}✖ $NAME ($PORT) TCP FAIL${RESET}"
+        echo -e "${RED}✖ $NAME ($PORT) nem elérhető${RESET}"
     fi
 }
 
 banner() {
     clear
-    echo -e "${BLUE}"
+    echo -e "${MAGENTA}${BOLD}"
     echo "========================================"
-    echo "   Debian Szerver Telepítő Script"
+    echo "      Debian Server Installer"
     echo "========================================"
     echo -e "${RESET}"
 }
 
-# --- Internet kapcsolat ellenőrzése ---
-echo -e "${BLUE}▶ Internet kapcsolat ellenőrzése (8.8.8.8)${RESET}"
-
-if ping -c 3 -W 2 8.8.8.8 > /dev/null 2>&1; then
-    echo -e "${GREEN}✔ Internet kapcsolat rendben${RESET}\n"
+# --- Internet kapcsolat ---
+echo -e "${CYAN}▶ Ellenőrzés: internet kapcsolat (8.8.8.8)${RESET}"
+if ping -c 3 -W 2 8.8.8.8 &>/dev/null; then
+    echo -e "${GREEN}✔ Internet rendben${RESET}"
 else
-    echo -e "${RED}✖ Nincs internet kapcsolat!${RESET}"
-    echo -e "${YELLOW}A telepítés megszakítva.${RESET}"
+    echo -e "${RED}✖ Nincs internet kapcsolat, a telepítés megszakad!${RESET}"
     exit 1
 fi
-
-
-install_pkg() {
-    local NAME="$1"
-    local CMD="$2"
-
-    echo -e "${BLUE}▶ Telepítés: $NAME${RESET}"
-    run_cmd "$CMD"
-    echo -e "${GREEN}✔ Kész: $NAME${RESET}\n"
-}
 
 # ==============================
 #  TELEPÍTÉS
@@ -89,70 +86,40 @@ install_pkg() {
 
 banner
 echo -e "${CYAN}Log fájl: $LOG_FILE${RESET}"
-echo -e "${CYAN}Dry-run mód: $DRY_RUN${RESET}\n"
+echo -e "${CYAN}Dry-run: $DRY_RUN${RESET}"
+echo
 
-run_cmd "apt update -y"
+run_cmd "Frissítés" "apt update -y"
 
-[[ "$INSTALL_APACHE" == "true" ]] && install_pkg "Apache2" "apt install -y apache2"
-[[ "$INSTALL_PHP" == "true" ]] && install_pkg "PHP + Apache modul" "apt install -y php libapache2-mod-php"
-[[ "$INSTALL_SSH" == "true" ]] && install_pkg "OpenSSH" "apt install -y openssh-server"
-[[ "$INSTALL_MOSQUITTO" == "true" ]] && install_pkg "Mosquitto MQTT" "apt install -y mosquitto mosquitto-clients"
-[[ "$INSTALL_MARIADB" == "true" ]] && install_pkg "MariaDB Server" "apt install -y mariadb-server"
-apt install -y curl
+[[ "$INSTALL_APACHE" == "true" ]] && run_cmd "Apache2 telepítése" "apt install -y apache2"
+[[ "$INSTALL_PHP" == "true" ]] && run_cmd "PHP + Apache modul" "apt install -y php libapache2-mod-php"
+[[ "$INSTALL_SSH" == "true" ]] && run_cmd "OpenSSH telepítése" "apt install -y openssh-server"
+[[ "$INSTALL_MOSQUITTO" == "true" ]] && run_cmd "Mosquitto MQTT telepítése" "apt install -y mosquitto mosquitto-clients"
+[[ "$INSTALL_MARIADB" == "true" ]] && run_cmd "MariaDB telepítése" "apt install -y mariadb-server"
+run_cmd "Curl telepítése" "apt install -y curl"
 
 # --- Node-RED ---
 if [[ "$INSTALL_NODE_RED" == "true" ]]; then
-    echo -e "${BLUE}▶ Node.js ${NODE_VERSION} + Node-RED telepítése${RESET}"
+    [[ -z "$NODE_VERSION" ]] && { echo -e "${RED}[ERROR] NODE_VERSION nincs a config.conf-ban!${RESET}"; exit 1; }
 
-    # Ellenőrizzük, hogy NODE_VERSION definiálva van-e
-    if [[ -z "$NODE_VERSION" ]]; then
-        echo -e "${RED}[ERROR] NODE_VERSION nincs definiálva a config.conf-ban!${RESET}"
-        exit 1
-    fi
+    run_cmd "Node.js setup" "curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -"
+    run_cmd "Node.js telepítés" "apt install -y nodejs"
+    run_cmd "Node-RED telepítés" "npm install -g --unsafe-perm node-red"
 
-    # Node.js telepítés
-    run_cmd "curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -"
-    run_cmd "apt install -y nodejs"
-
-    # Ellenőrizzük node és npm
-    if [[ "$DRY_RUN" == "false" ]]; then
-        if ! command -v node &>/dev/null || ! command -v npm &>/dev/null; then
-            echo -e "${RED}[ERROR] Node.js vagy npm nem települt rendesen!${RESET}"
-            exit 1
-        fi
-    fi
-
-    # Node-RED telepítés globálisan
-    run_cmd "npm install -g --unsafe-perm node-red"
-
-    # Absolute path Node-REDhez
     if [[ "$DRY_RUN" == "false" ]]; then
         NR_PATH=$(which node-red)
-        if [[ -z "$NR_PATH" ]]; then
-            echo -e "${RED}[ERROR] node-red parancs nem található!${RESET}"
-            exit 1
-        fi
+        [[ -z "$NR_PATH" ]] && { echo -e "${RED}[ERROR] node-red nem található!${RESET}"; exit 1; }
     else
         NR_PATH="/usr/bin/env node-red"
     fi
 
-    # Felhasználó létrehozása
-    echo -e "${BLUE}▶ Node-RED felhasználó létrehozása${RESET}"
-    if id "$NODE_RED_USER" &>/dev/null; then
-        echo -e "${YELLOW}ℹ Felhasználó már létezik: $NODE_RED_USER${RESET}"
-    else
-        run_cmd "useradd --system --home $NODE_RED_HOME --shell /usr/sbin/nologin $NODE_RED_USER"
-        run_cmd "mkdir -p $NODE_RED_HOME && chown -R $NODE_RED_USER:$NODE_RED_USER $NODE_RED_HOME"
-    fi
+    [[ $(id -u "$NODE_RED_USER" 2>/dev/null) ]] || run_cmd "Node-RED felhasználó létrehozása" "useradd --system --home $NODE_RED_HOME --shell /usr/sbin/nologin $NODE_RED_USER && mkdir -p $NODE_RED_HOME && chown -R $NODE_RED_USER:$NODE_RED_USER $NODE_RED_HOME"
 
-    # Systemd service létrehozása
-    echo -e "${BLUE}▶ Node-RED systemd service létrehozása${RESET}"
     if [[ "$DRY_RUN" == "false" ]]; then
 cat <<EOF >/etc/systemd/system/node-red.service
 [Unit]
 Description=Node-RED
 After=network.target
-
 [Service]
 Type=simple
 User=${NODE_RED_USER}
@@ -162,98 +129,49 @@ ExecStart=${NR_PATH}
 Restart=always
 Environment=PATH=/usr/bin:/usr/local/bin
 Environment=NODE_RED_HOME=${NODE_RED_HOME}
-
 [Install]
 WantedBy=multi-user.target
 EOF
-    else
-        echo -e "${YELLOW}[DRY-RUN] Node-RED service fájl létrehozása kihagyva${RESET}"
     fi
 
-    # Service reload és indítás
-    run_cmd "systemctl daemon-reexec"
-    run_cmd "systemctl daemon-reload"
-    run_cmd "systemctl enable node-red"
-    run_cmd "systemctl start node-red"
-
-    echo -e "${GREEN}✔ Node-RED telepítve és nem rootként fut${RESET}\n"
-
-    # Port ellenőrzés localhoston
-    check_port_nc "$PORT_NODE_RED" "Node-RED"
+    run_cmd "Node-RED service indítása" "systemctl daemon-reexec && systemctl daemon-reload && systemctl enable node-red && systemctl start node-red"
 fi
 
-
-# --- Apache HTTPS (SSL) ---
+# --- Apache SSL ---
 if [[ "$INSTALL_APACHE" == "true" && "$ENABLE_APACHE_SSL" == "true" ]]; then
-    echo -e "${BLUE}▶ Apache HTTPS (SSL) engedélyezése${RESET}"
-
-    run_cmd "/sbin/a2enmod ssl"
-    run_cmd "/sbin/a2ensite default-ssl"
-    run_cmd "systemctl reload apache2"
-
-    echo -e "${GREEN}✔ Apache HTTPS engedélyezve${RESET}\n"
+    run_cmd "SSL modul engedélyezése" "/sbin/a2enmod ssl"
+    run_cmd "default-ssl site engedélyezése" "/sbin/a2ensite default-ssl"
+    run_cmd "Apache újratöltés" "systemctl reload apache2"
 fi
 
 # --- UFW ---
 if [[ "$INSTALL_UFW" == "true" ]]; then
-    echo -e "${BLUE}▶ UFW tűzfal telepítése és konfigurálása${RESET}"
-
-    install_pkg "UFW" "apt install -y ufw"
-
-    echo -e "${CYAN}Portok engedélyezése...${RESET}"
-
-    run_cmd "/sbin/ufw allow ${PORT_SSH}/tcp comment 'SSH'"
-    run_cmd "/sbin/ufw allow ${PORT_HTTP}/tcp comment 'HTTP'"
-    run_cmd "/sbin/ufw allow ${PORT_HTTPS}/tcp comment 'HTTPS'"
-    run_cmd "/sbin/ufw allow ${PORT_MQTT}/tcp comment 'MQTT'"
-    run_cmd "/sbin/ufw allow ${PORT_NODE_RED}/tcp comment 'Node-RED'"
-
-    if [[ "$ALLOW_MARIADB_EXTERNAL" == "true" ]]; then
-        run_cmd "/sbin/ufw allow ${PORT_MARIADB}/tcp comment 'MariaDB'"
-    else
-        echo -e "${YELLOW}ℹ MariaDB port nem lett megnyitva (csak localhost)${RESET}"
-    fi
-
-    # MQTT SSL opcionális
-    if [[ -n "$PORT_MQTT_SSL" ]]; then
-        run_cmd "/sbin/ufw allow ${PORT_MQTT_SSL}/tcp comment 'MQTT SSL'"
-    fi
-
-    echo -e "${CYAN}UFW engedélyezése...${RESET}"
-    run_cmd "/sbin/ufw --force enable"
-    run_cmd "/sbin/ufw reload"
-
-    echo -e "${GREEN}✔ UFW konfigurálva${RESET}\n"
+    run_cmd "UFW telepítése" "apt install -y ufw"
+    run_cmd "SSH port engedélyezése" "/sbin/ufw allow ${PORT_SSH}/tcp"
+    run_cmd "HTTP port engedélyezése" "/sbin/ufw allow ${PORT_HTTP}/tcp"
+    run_cmd "HTTPS port engedélyezése" "/sbin/ufw allow ${PORT_HTTPS}/tcp"
+    run_cmd "MQTT port engedélyezése" "/sbin/ufw allow ${PORT_MQTT}/tcp"
+    run_cmd "Node-RED port engedélyezése" "/sbin/ufw allow ${PORT_NODE_RED}/tcp"
+    [[ "$ALLOW_MARIADB_EXTERNAL" == "true" ]] && run_cmd "MariaDB port engedélyezése" "/sbin/ufw allow ${PORT_MARIADB}/tcp"
+    run_cmd "UFW engedélyezése" "/sbin/ufw --force enable && /sbin/ufw reload"
 fi
 
+# --- Szolgáltatások indítása ---
+run_cmd "Szolgáltatások engedélyezése és indítása" "systemctl enable apache2 ssh mosquitto mariadb && systemctl restart apache2 ssh mosquitto mariadb"
 
-
-# --- Szolgáltatások ---
-echo -e "${BLUE}▶ Szolgáltatások engedélyezése${RESET}"
-run_cmd "systemctl enable apache2 ssh mosquitto mariadb"
-run_cmd "systemctl restart apache2 ssh mosquitto mariadb"
-
-# --- Tűzfal státusz ---
-echo -e "${BLUE}▶ Tűzfal státusz${RESET}"
-run_cmd "/sbin/ufw status verbose"
-
-
-# --- Tűzfal portellenőrzés ---
-echo -e "\n${BLUE}▶ Szolgáltatások port ellenőrzése (localhost)${RESET}"
-
+# --- Port ellenőrzés ---
+echo
+echo -e "${CYAN}▶ Szolgáltatások port ellenőrzése:${RESET}"
 [[ "$INSTALL_SSH" == "true" ]] && check_port_nc "$PORT_SSH" "SSH"
 [[ "$INSTALL_APACHE" == "true" ]] && check_port_nc "$PORT_HTTP" "HTTP"
 [[ "$INSTALL_APACHE" == "true" ]] && check_port_nc "$PORT_HTTPS" "HTTPS"
 [[ "$INSTALL_MOSQUITTO" == "true" ]] && check_port_nc "$PORT_MQTT" "MQTT"
 [[ "$INSTALL_NODE_RED" == "true" ]] && check_port_nc "$PORT_NODE_RED" "Node-RED"
+[[ "$INSTALL_MARIADB" == "true" ]] && check_port_nc "$PORT_MARIADB" "MariaDB"
 
-if [[ "$INSTALL_MARIADB" == "true" ]]; then
-    check_port_nc "$PORT_MARIADB" "MariaDB"
-fi
-
-
-echo -e "${GREEN}"
+echo
+echo -e "${MAGENTA}${BOLD}"
 echo "========================================"
-echo "  Telepítés befejezve!"
+echo "      Telepítés befejezve!"
 echo "========================================"
 echo -e "${RESET}"
