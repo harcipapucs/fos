@@ -98,6 +98,7 @@ run_cmd "apt update -y"
 [[ "$INSTALL_SSH" == "true" ]] && install_pkg "OpenSSH" "apt install -y openssh-server"
 [[ "$INSTALL_MOSQUITTO" == "true" ]] && install_pkg "Mosquitto MQTT" "apt install -y mosquitto mosquitto-clients"
 [[ "$INSTALL_MARIADB" == "true" ]] && install_pkg "MariaDB Server" "apt install -y mariadb-server"
+apt install -y curl
 
 # --- Node-RED ---
 if [[ "$INSTALL_NODE_RED" == "true" ]]; then
