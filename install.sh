@@ -42,6 +42,17 @@ run_cmd() {
     fi
 }
 
+check_port_nc() {
+    local PORT="$1"
+    local NAME="$2"
+
+    if nc -z localhost "$PORT" 2>/dev/null; then
+        echo -e "${GREEN}✔ $NAME ($PORT) TCP OK${RESET}"
+    else
+        echo -e "${RED}✖ $NAME ($PORT) TCP FAIL${RESET}"
+    fi
+}
+
 banner() {
     clear
     echo -e "${BLUE}"
@@ -141,16 +152,18 @@ run_cmd "ufw status verbose"
 
 
 # --- Tűzfal portellenőrzés ---
-check_port() {
-    local PORT="$1"
-    local NAME="$2"
+echo -e "\n${BLUE}▶ Szolgáltatások port ellenőrzése (localhost)${RESET}"
 
-    if ss -lnt | awk '{print $4}' | grep -q ":$PORT$"; then
-        echo -e "${GREEN}✔ $NAME ($PORT) LISTENING${RESET}"
-    else
-        echo -e "${RED}✖ $NAME ($PORT) NEM ELÉRHETŐ${RESET}"
-    fi
-}
+[[ "$INSTALL_SSH" == "true" ]] && check_port_nc "$PORT_SSH" "SSH"
+[[ "$INSTALL_APACHE" == "true" ]] && check_port_nc "$PORT_HTTP" "HTTP"
+[[ "$INSTALL_APACHE" == "true" ]] && check_port_nc "$PORT_HTTPS" "HTTPS"
+[[ "$INSTALL_MOSQUITTO" == "true" ]] && check_port_nc "$PORT_MQTT" "MQTT"
+[[ "$INSTALL_NODE_RED" == "true" ]] && check_port_nc "$PORT_NODE_RED" "Node-RED"
+
+if [[ "$INSTALL_MARIADB" == "true" ]]; then
+    check_port_nc "$PORT_MARIADB" "MariaDB"
+fi
+
 
 echo -e "${GREEN}"
 echo "========================================"
