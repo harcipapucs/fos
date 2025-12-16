@@ -103,12 +103,37 @@ run_cmd "apt update -y"
 if [[ "$INSTALL_NODE_RED" == "true" ]]; then
     echo -e "${BLUE}▶ Node.js ${NODE_VERSION} + Node-RED telepítése${RESET}"
 
+    # Ellenőrizzük, hogy NODE_VERSION definiálva van-e
+    if [[ -z "$NODE_VERSION" ]]; then
+        echo -e "${RED}[ERROR] NODE_VERSION nincs definiálva a config.conf-ban!${RESET}"
+        exit 1
+    fi
+
     # Node.js telepítés
     run_cmd "curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -"
     run_cmd "apt install -y nodejs"
-    
+
+    # Ellenőrizzük node és npm
+    if [[ "$DRY_RUN" == "false" ]]; then
+        if ! command -v node &>/dev/null || ! command -v npm &>/dev/null; then
+            echo -e "${RED}[ERROR] Node.js vagy npm nem települt rendesen!${RESET}"
+            exit 1
+        fi
+    fi
+
     # Node-RED telepítés globálisan
     run_cmd "npm install -g --unsafe-perm node-red"
+
+    # Absolute path Node-REDhez
+    if [[ "$DRY_RUN" == "false" ]]; then
+        NR_PATH=$(which node-red)
+        if [[ -z "$NR_PATH" ]]; then
+            echo -e "${RED}[ERROR] node-red parancs nem található!${RESET}"
+            exit 1
+        fi
+    else
+        NR_PATH="/usr/bin/env node-red"
+    fi
 
     # Felhasználó létrehozása
     echo -e "${BLUE}▶ Node-RED felhasználó létrehozása${RESET}"
@@ -122,7 +147,7 @@ if [[ "$INSTALL_NODE_RED" == "true" ]]; then
     # Systemd service létrehozása
     echo -e "${BLUE}▶ Node-RED systemd service létrehozása${RESET}"
     if [[ "$DRY_RUN" == "false" ]]; then
-cat <<EOF > /etc/systemd/system/node-red.service
+cat <<EOF >/etc/systemd/system/node-red.service
 [Unit]
 Description=Node-RED
 After=network.target
@@ -132,7 +157,7 @@ Type=simple
 User=${NODE_RED_USER}
 Group=${NODE_RED_USER}
 WorkingDirectory=${NODE_RED_HOME}
-ExecStart=/usr/bin/env node-red
+ExecStart=${NR_PATH}
 Restart=always
 Environment=PATH=/usr/bin:/usr/local/bin
 Environment=NODE_RED_HOME=${NODE_RED_HOME}
@@ -152,7 +177,10 @@ EOF
 
     echo -e "${GREEN}✔ Node-RED telepítve és nem rootként fut${RESET}\n"
 
+    # Port ellenőrzés localhoston
+    check_port_nc "$PORT_NODE_RED" "Node-RED"
 fi
+
 
 # --- Apache HTTPS (SSL) ---
 if [[ "$INSTALL_APACHE" == "true" && "$ENABLE_APACHE_SSL" == "true" ]]; then
