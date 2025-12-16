@@ -4,7 +4,7 @@
 #  Debian Server Installer
 # ==============================
 
-CONFIG_FILE="./installer.conf"
+CONFIG_FILE="./config.conf"
 
 # --- Színek ---
 RED="\e[31m"
