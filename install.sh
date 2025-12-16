@@ -148,7 +148,7 @@ run_cmd "systemctl restart apache2 ssh mosquitto mariadb"
 
 # --- Tűzfal státusz ---
 echo -e "${BLUE}▶ Tűzfal státusz${RESET}"
-run_cmd "ufw status verbose"
+run_cmd "/sbin/ufw status verbose"
 
 
 # --- Tűzfal portellenőrzés ---
