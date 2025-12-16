@@ -116,30 +116,26 @@ if [[ "$INSTALL_UFW" == "true" ]]; then
 
     echo -e "${CYAN}Portok engedélyezése...${RESET}"
 
-    run_cmd "ufw enable"
-
-    echo -e "${CYAN}Portok engedélyezése...${RESET}"
-
-    run_cmd "ufw allow ${PORT_SSH}/tcp comment 'SSH'"
-    run_cmd "ufw allow ${PORT_HTTP}/tcp comment 'HTTP'"
-    run_cmd "ufw allow ${PORT_HTTPS}/tcp comment 'HTTPS'"
-    run_cmd "ufw allow ${PORT_MQTT}/tcp comment 'MQTT'"
-    run_cmd "ufw allow ${PORT_NODE_RED}/tcp comment 'Node-RED'"
+    run_cmd "/sbin/ufw allow ${PORT_SSH}/tcp comment 'SSH'"
+    run_cmd "/sbin/ufw allow ${PORT_HTTP}/tcp comment 'HTTP'"
+    run_cmd "/sbin/ufw allow ${PORT_HTTPS}/tcp comment 'HTTPS'"
+    run_cmd "/sbin/ufw allow ${PORT_MQTT}/tcp comment 'MQTT'"
+    run_cmd "/sbin/ufw allow ${PORT_NODE_RED}/tcp comment 'Node-RED'"
 
     if [[ "$ALLOW_MARIADB_EXTERNAL" == "true" ]]; then
-        run_cmd "ufw allow ${PORT_MARIADB}/tcp comment 'MariaDB'"
+        run_cmd "/sbin/ufw allow ${PORT_MARIADB}/tcp comment 'MariaDB'"
     else
         echo -e "${YELLOW}ℹ MariaDB port nem lett megnyitva (csak localhost)${RESET}"
     fi
 
     # MQTT SSL opcionális
     if [[ -n "$PORT_MQTT_SSL" ]]; then
-        run_cmd "ufw allow ${PORT_MQTT_SSL}/tcp comment 'MQTT SSL'"
+        run_cmd "/sbin/ufw allow ${PORT_MQTT_SSL}/tcp comment 'MQTT SSL'"
     fi
 
     echo -e "${CYAN}UFW engedélyezése...${RESET}"
-    run_cmd "ufw --force enable"
-    run_cmd "ufw reload"
+    run_cmd "/sbin/ufw --force enable"
+    run_cmd "/sbin/ufw reload"
 
     echo -e "${GREEN}✔ UFW konfigurálva${RESET}\n"
 fi
