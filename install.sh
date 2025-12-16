@@ -116,6 +116,10 @@ if [[ "$INSTALL_UFW" == "true" ]]; then
 
     echo -e "${CYAN}Portok engedélyezése...${RESET}"
 
+    run_cmd "ufw enable"
+
+    echo -e "${CYAN}Portok engedélyezése...${RESET}"
+
     run_cmd "ufw allow ${PORT_SSH}/tcp comment 'SSH'"
     run_cmd "ufw allow ${PORT_HTTP}/tcp comment 'HTTP'"
     run_cmd "ufw allow ${PORT_HTTPS}/tcp comment 'HTTPS'"
