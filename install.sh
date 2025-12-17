@@ -112,29 +112,7 @@ if [[ "$INSTALL_NODE_RED" == "true" ]]; then
     else
         NR_PATH="/usr/bin/env node-red"
     fi
-
-    [[ $(id -u "$NODE_RED_USER" 2>/dev/null) ]] || run_cmd "Node-RED felhasználó létrehozása" "useradd --system --home $NODE_RED_HOME --shell /usr/sbin/nologin $NODE_RED_USER && mkdir -p $NODE_RED_HOME && chown -R $NODE_RED_USER:$NODE_RED_USER $NODE_RED_HOME"
-
-    if [[ "$DRY_RUN" == "false" ]]; then
-cat <<EOF >/etc/systemd/system/node-red.service
-[Unit]
-Description=Node-RED
-After=network.target
-[Service]
-Type=simple
-User=${NODE_RED_USER}
-Group=${NODE_RED_USER}
-WorkingDirectory=${NODE_RED_HOME}
-ExecStart=${NR_PATH}
-Restart=always
-Environment=PATH=/usr/bin:/usr/local/bin
-Environment=NODE_RED_HOME=${NODE_RED_HOME}
-[Install]
-WantedBy=multi-user.target
-EOF
-    fi
-
-    run_cmd "Node-RED service indítása" "systemctl daemon-reexec && systemctl daemon-reload && systemctl enable node-red && systemctl start node-red"
+    run_cmd "Node-RED service indítása" "systemctl daemon-reexec && systemctl daemon-reload"
 fi
 
 # --- Apache SSL ---
